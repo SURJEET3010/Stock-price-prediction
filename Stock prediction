@@ -1,0 +1,96 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from pmdarima import auto_arima
+from pmdarima.arima import ADFTest
+import warnings
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
+df = pd.read_csv('BAJFINANCE.xls')
+df.set_index('Date',inplace=True)
+
+# so u can observe here some kind of Seasonality
+"""
+ ------------ Feature Engineering -----------
+Almost every time series problem will have some external features or some internal feature engineering to help the model.
+
+Let's add some basic features like lag values of available numeric features that are widely used for time series problems. Since we need to predict the price of the stock for a day, we cannot use the feature values of the same day since they will be unavailable at actual inference time. We need to use statistics like mean, standard deviation of their lagged values.
+
+We will use three sets of lagged values, one previous day, one looking back 7 days and another looking back 30 days as a proxy for last week and last month metrics.
+"""
+
+# Data Pre-Processing
+
+df.isna().sum()
+
+df.dropna(inplace=True)
+
+df.isna().sum()
+
+data = df.copy()
+
+lag_features = ['High','Low','Volume','Turnover','Trades']
+window1 = 3
+window2 = 7
+
+for feature in lag_features:
+    data[feature+'rolling_mean_3']=data[feature].rolling(window=window1).mean()
+    data[feature+'rolling_mean_7']=data[feature].rolling(window=window2).mean()
+
+for feature in lag_features:
+    data[feature+'rolling_std_3']=data[feature].rolling(window=window1).std()
+    data[feature+'rolling_std_7']=data[feature].rolling(window=window2).std()
+
+data.head()
+
+data.isna().sum()
+
+data.dropna(inplace=True)
+# perform testing whether the data is stationary or not
+adf_test = ADFTest(alpha=0.05).should_diff(data['VWAP'])
+print(adf_test)
+
+ind_features=['Highrolling_mean_3', 'Highrolling_mean_7',
+       'Lowrolling_mean_3', 'Lowrolling_mean_7', 'Volumerolling_mean_3',
+       'Volumerolling_mean_7', 'Turnoverrolling_mean_3',
+       'Turnoverrolling_mean_7', 'Tradesrolling_mean_3',
+       'Tradesrolling_mean_7', 'Highrolling_std_3', 'Highrolling_std_7',
+       'Lowrolling_std_3', 'Lowrolling_std_7', 'Volumerolling_std_3',
+       'Volumerolling_std_7', 'Turnoverrolling_std_3', 'Turnoverrolling_std_7',
+       'Tradesrolling_std_3', 'Tradesrolling_std_7']
+
+training_data=data[0:1800]
+test_data=data[1800:]
+
+# plt.plot(training_data['VWAP'])
+# plt.plot(test_data['VWAP'])
+# plt.show()
+# get_ipython().system('pip install pmdarima')
+
+warnings.filterwarnings('ignore')
+
+model=auto_arima(y=training_data['VWAP'],exogenous=training_data[ind_features],trace=True)
+model.fit(training_data['VWAP'],training_data[ind_features])
+forecast=model.predict(n_periods=len(test_data), exogenous=test_data[ind_features])
+
+test_data['Forecast_ARIMA'] = forecast
+
+plt.figure(figsize=(12,6))
+plt.plot(training_data['VWAP'], label='Training')
+plt.plot(test_data['VWAP'], label='Test')
+plt.plot(test_data['Forecast_ARIMA'], label='Forecast')
+plt.legend()
+plt.show()
+
+# plt.plot(training_data, label ="Training")
+# plt.plot(test_data, label ="Test")
+# plt.plot(forecast, label ="Forecast")
+# plt.legend(loc='Left corner')
+# plt.show()
+
+np.sqrt(mean_squared_error(test_data['VWAP'],test_data['Forecast_ARIMA']))
+
+mean_absolute_error(test_data['VWAP'],test_data['Forecast_ARIMA'])
+
+
