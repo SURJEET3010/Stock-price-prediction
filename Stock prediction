@@ -8,9 +8,9 @@ import warnings
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 df = pd.read_csv('BAJFINANCE.xls')
-df.set_index('Date',inplace=True)
+df.set_index('Date',inplace=True)   # setting date as index  so u can observe here some kind of Seasonality
 
-# so u can observe here some kind of Seasonality
+
 """
  ------------ Feature Engineering -----------
 Almost every time series problem will have some external features or some internal feature engineering to help the model.
